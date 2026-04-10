@@ -35,4 +35,12 @@ return [
         ],
     ],
 
+    'wb_api' => [
+        'base_url' => env('WB_API_BASE_URL'),
+        'key' => env('WB_API_KEY'),
+        'default_limit' => (int) env('WB_API_DEFAULT_LIMIT', 100),
+        'timeout_seconds' => (int) env('WB_API_TIMEOUT_SECONDS', 30),
+        'page_sleep_seconds' => (int) env('WB_API_PAGE_SLEEP_SECONDS', 1),
+    ],
+
 ];

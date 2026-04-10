@@ -19,12 +19,12 @@ return new class extends Migration
             $table->date('last_change_date')->nullable()->index();
             $table->string('supplier_article')->nullable()->index();
             $table->string('tech_size')->nullable();
-            $table->unsignedBigInteger('barcode')->nullable()->index();
+            $table->bigInteger('barcode')->nullable()->index();
             $table->unsignedInteger('quantity')->nullable();
             $table->decimal('total_price', 14, 4)->nullable();
             $table->date('date_close')->nullable()->index();
             $table->string('warehouse_name')->nullable();
-            $table->unsignedBigInteger('nm_id')->nullable()->index();
+            $table->bigInteger('nm_id')->nullable()->index();
             $table->timestamps();
         });
     }
