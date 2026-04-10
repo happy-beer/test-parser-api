@@ -42,6 +42,8 @@ return [
         'default_limit' => (int) env('WB_API_DEFAULT_LIMIT', 100),
         'timeout_seconds' => (int) env('WB_API_TIMEOUT_SECONDS', 30),
         'page_sleep_seconds' => (int) env('WB_API_PAGE_SLEEP_SECONDS', 1),
+        'retry_attempts' => (int) env('WB_API_RETRY_ATTEMPTS', 3),
+        'retry_base_ms' => (int) env('WB_API_RETRY_BASE_MS', 1000),
     ],
 
 ];

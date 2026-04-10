@@ -2,7 +2,10 @@
 
 namespace App\Services;
 
+use App\Exceptions\SyncRequestException;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -14,6 +17,8 @@ class EntitySyncService
     protected int $defaultLimit;
     protected int $timeout;
     protected int $pageSleepSeconds;
+    protected int $retryAttempts;
+    protected int $retryBaseMs;
 
     public function __construct()
     {
@@ -22,6 +27,8 @@ class EntitySyncService
         $this->defaultLimit = (int)config('services.wb_api.default_limit', 100);
         $this->timeout = (int)config('services.wb_api.timeout_seconds', 30);
         $this->pageSleepSeconds = max(0, (int)config('services.wb_api.page_sleep_seconds', 1));
+        $this->retryAttempts = max(1, (int)config('services.wb_api.retry_attempts', 3));
+        $this->retryBaseMs = max(100, (int)config('services.wb_api.retry_base_ms', 1000));
 
         if ($this->baseUrl === '' || $this->key === '') {
             throw new RuntimeException('WB API credentials are not configured. Set WB_API_BASE_URL and WB_API_KEY.');
@@ -76,19 +83,7 @@ class EntitySyncService
                 $query['dateTo'] = $dateTo;
             }
 
-            $response = Http::timeout($this->timeout)
-                ->acceptJson()
-                ->get($this->baseUrl . '/' . $endpoint, $query);
-
-            if (!$response->successful()) {
-                throw new RuntimeException(sprintf(
-                    'Request failed for %s (page %d): HTTP %d: %s',
-                    $endpoint,
-                    $page,
-                    $response->status(),
-                    $response->body()
-                ));
-            }
+            $response = $this->requestWithRetry($endpoint, $query, $page);
 
             $payload = $response->json();
             $items = is_array($payload['data'] ?? null) ? $payload['data'] : [];
@@ -157,4 +152,73 @@ class EntitySyncService
         return $identity;
     }
 
+    /**
+     * @param array<string, mixed> $query
+     */
+    private function requestWithRetry(string $endpoint, array $query, int $page): Response
+    {
+        $attempt = 1;
+
+        while (true) {
+            try {
+                $response = Http::timeout($this->timeout)
+                    ->acceptJson()
+                    ->get($this->baseUrl . '/' . $endpoint, $query);
+            } catch (ConnectionException $e) {
+                if ($attempt >= $this->retryAttempts) {
+                    throw new RuntimeException(sprintf(
+                        'Request failed for %s (page %d): connection error after %d attempts: %s',
+                        $endpoint,
+                        $page,
+                        $attempt,
+                        $e->getMessage()
+                    ), previous: $e);
+                }
+
+                $this->sleepBeforeRetry($attempt);
+                $attempt++;
+                continue;
+            }
+
+            if ($response->successful()) {
+                return $response;
+            }
+
+            $status = $response->status();
+            $isRetryable = $status === 429 || $status >= 500;
+
+            if (!$isRetryable || $attempt >= $this->retryAttempts) {
+                throw new SyncRequestException(
+                    endpoint: $endpoint,
+                    page: $page,
+                    status: $status,
+                    responseBody: $response->body()
+                );
+            }
+
+            $this->sleepBeforeRetry($attempt, $response);
+            $attempt++;
+        }
+    }
+
+    private function sleepBeforeRetry(int $attempt, ?Response $response = null): void
+    {
+        $retryAfterSeconds = null;
+
+        if ($response !== null) {
+            $header = $response->header('Retry-After');
+
+            if (is_string($header) && ctype_digit($header)) {
+                $retryAfterSeconds = (int)$header;
+            }
+        }
+
+        if ($retryAfterSeconds !== null && $retryAfterSeconds > 0) {
+            sleep($retryAfterSeconds);
+            return;
+        }
+
+        $delayMs = $this->retryBaseMs * (2 ** max(0, $attempt - 1));
+        usleep($delayMs * 1000);
+    }
 }

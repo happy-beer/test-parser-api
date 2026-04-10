@@ -43,7 +43,12 @@ class SyncCycleCommand extends Command
             $maxPages = $testMode ? 10 : null;
 
             foreach ($entities as $entityKey) {
-                $commandClass = $this->entityCommandMap[$entityKey];
+                $commandClass = $this->entityCommandMap[$entityKey] ?? null;
+
+                if ($commandClass === null) {
+                    throw new InvalidArgumentException(sprintf('Unknown entity "%s".', $entityKey));
+                }
+
                 $command = app($commandClass);
 
                 if (!$command instanceof BaseSyncCommand) {
