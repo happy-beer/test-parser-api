@@ -12,13 +12,15 @@ class SyncStocksCommand extends BaseSyncCommand
 
     protected string $modelClass = Stock::class;
 
+    protected bool $supportsDateTo = false;
+
     /**
      * @var array<int, string>
      */
     protected array $uniqueColumns = ['date', 'warehouse_name', 'nm_id', 'barcode', 'tech_size'];
 
     protected $signature = 'sync:stocks
-        {dateFrom? : DateTime in Y-m-d format}
+        {dateFrom? : Date in Y-m-d format}
         {--limit= : Records per page}
         {--page=1 : Start page}';
 

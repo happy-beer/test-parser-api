@@ -17,10 +17,32 @@ abstract class BaseSyncCommand extends Command
 
     protected string $modelClass;
 
+    protected bool $supportsDateTo = true;
+
     /**
      * @var array<int, string>
      */
     protected array $uniqueColumns = [];
+
+    /**
+     * @return array{
+     *     label:string,
+     *     endpoint:string,
+     *     modelClass:string,
+     *     uniqueColumns:array<int, string>,
+     *     supportsDateTo:bool
+     * }
+     */
+    public function getSyncDefinition(): array
+    {
+        return [
+            'label' => $this->label,
+            'endpoint' => $this->endpoint,
+            'modelClass' => $this->modelClass,
+            'uniqueColumns' => $this->uniqueColumns,
+            'supportsDateTo' => $this->supportsDateTo,
+        ];
+    }
 
     public function handle(EntitySyncService $syncService): int
     {
